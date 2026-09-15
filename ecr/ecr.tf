@@ -2,7 +2,7 @@ module "repository" {
   source = "../modules/ecr-repo"
 
   repository_name = var.repository_name
-  tags             = var.tags
+  tags            = var.tags
 }
 
 # Preserves existing state: this repo used to be a bare resource in this

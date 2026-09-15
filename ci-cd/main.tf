@@ -8,7 +8,7 @@ terraform {
 
   backend "s3" {
     bucket = "renays-lab-s3"
-    key = "renays-lab-ci-cd-tf-state/terraform.tfstate"
+    key    = "renays-lab-ci-cd-tf-state/terraform.tfstate"
     region = "us-east-2"
   }
 }

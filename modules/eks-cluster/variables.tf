@@ -20,6 +20,11 @@ variable "node_group_name" {
   description = "Name of the managed node group."
 }
 
+variable "vpc_id" {
+  type        = string
+  description = "VPC ID the cluster and node group run in, used to scope the node security group."
+}
+
 variable "subnet_ids" {
   type        = list(string)
   description = "Subnet IDs for the cluster control plane and node group."
@@ -29,6 +34,11 @@ variable "endpoint_public_access" {
   type        = bool
   description = "Whether the cluster API server endpoint is publicly accessible."
   default     = true
+}
+
+variable "endpoint_public_access_cidrs" {
+  type        = list(string)
+  description = "CIDR blocks allowed to reach the public API server endpoint. Required whenever endpoint_public_access is true - AWS defaults to 0.0.0.0/0 if this isn't set."
 }
 
 variable "endpoint_private_access" {

@@ -17,3 +17,8 @@ output "oidc_provider_arn" {
 output "oidc_provider_url" {
   value = aws_iam_openid_connect_provider.this.url
 }
+
+output "node_security_group_id" {
+  value       = aws_security_group.node.id
+  description = "Security group attached to worker nodes. When you add a load balancer/ingress for the site, allow inbound to this group from the LB's security group rather than opening it to 0.0.0.0/0."
+}

@@ -1,4 +1,14 @@
-name: Terraform Deploy - EKS
+name: Terraform Deploy - S3 (bootstrap)
+
+# This stack creates the S3 bucket every other stack stores its remote state
+# in, so it intentionally has no remote backend of its own (see s3/main.tf).
+# That means this workflow has no persistent state between runs: state only
+# lives for the duration of a single run, passed from plan -> apply via the
+# uploaded artifact below. After apply succeeds, download the "tfstate-s3"
+# artifact from the run and keep it somewhere durable (e.g. commit it to a
+# private location or migrate the stack to a remote backend) before running
+# this workflow again, otherwise Terraform won't know the bucket already
+# exists and re-running plan/apply will try to recreate it.
 
 on:
   workflow_dispatch:
@@ -9,9 +19,9 @@ permissions:
 
 env:
   TF_VERSION: "1.6.6"
-  AWS_REGION: us-east-1
+  AWS_REGION: us-east-2
   ROLE_TO_ASSUME: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
-  WORKING_DIRECTORY: eks
+  WORKING_DIRECTORY: s3
 
 jobs:
   plan:
@@ -35,8 +45,9 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      # No remote backend for this stack - local state only.
       - name: Terraform Init
-        run: terraform init -input=false -backend-config=backend/renays-lab.hcl
+        run: terraform init -input=false
 
       - name: Terraform Validate
         run: terraform validate
@@ -47,7 +58,7 @@ jobs:
       - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-eks
+          name: tfplan-s3
           path: ${{ env.WORKING_DIRECTORY }}/tfplan
           retention-days: 1
 
@@ -75,13 +86,21 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        run: terraform init -input=false -backend-config=backend/renays-lab.hcl
+        run: terraform init -input=false
 
       - name: Download Plan
         uses: actions/download-artifact@v4
         with:
-          name: tfplan-eks
+          name: tfplan-s3
           path: ${{ env.WORKING_DIRECTORY }}
 
       - name: Terraform Apply
         run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Upload State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfstate-s3
+          path: ${{ env.WORKING_DIRECTORY }}/terraform.tfstate
+          retention-days: 30

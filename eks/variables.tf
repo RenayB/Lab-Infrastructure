@@ -29,6 +29,11 @@ variable "cluster_name" {
   description = "Name of the EKS cluster."
 }
 
+variable "endpoint_public_access_cidrs" {
+  type        = list(string)
+  description = "CIDR blocks allowed to reach the public EKS API server endpoint."
+}
+
 variable "cluster_role_name" {
   type        = string
   description = "Name of the IAM role for the EKS control plane."
