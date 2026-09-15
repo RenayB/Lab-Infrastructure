@@ -27,6 +27,7 @@ locals {
 
   managed_policy_arns = [
     "arn:aws:iam::${local.account_id}:policy/cert-manager-route53-policy",
+    "arn:aws:iam::${local.account_id}:policy/renays-lab-terraform-deploy-policy",
   ]
 }
 
