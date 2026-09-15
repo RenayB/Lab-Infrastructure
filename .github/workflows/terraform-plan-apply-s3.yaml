@@ -4,7 +4,7 @@ name: Terraform Deploy - S3 (bootstrap)
 # in, so it intentionally has no remote backend of its own (see s3/main.tf).
 # That means this workflow has no persistent state between runs: state only
 # lives for the duration of a single run, passed from plan -> apply via the
-# uploaded artifact below. After apply succeeds, download the "tfstate-s3"
+# uploaded artifact below. After apply succeeds, download the "tfstate-*"
 # artifact from the run and keep it somewhere durable (e.g. commit it to a
 # private location or migrate the stack to a remote backend) before running
 # this workflow again, otherwise Terraform won't know the bucket already
@@ -12,6 +12,14 @@ name: Terraform Deploy - S3 (bootstrap)
 
 on:
   workflow_dispatch:
+    inputs:
+      account:
+        description: "AWS account to deploy to"
+        type: choice
+        options:
+          - dev
+        default: dev
+        required: true
 
 permissions:
   id-token: write
@@ -20,13 +28,13 @@ permissions:
 env:
   TF_VERSION: "1.6.6"
   AWS_REGION: us-east-2
-  ROLE_TO_ASSUME: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
   WORKING_DIRECTORY: s3
 
 jobs:
   plan:
     name: Terraform Validate & Plan
     runs-on: ubuntu-latest
+    environment: ${{ inputs.account }}
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIRECTORY }}
@@ -37,7 +45,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -53,12 +61,12 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -input=false -var-file=tfvars/renays-lab.tfvars -out=tfplan
+        run: terraform plan -input=false -var-file=tfvars/${{ inputs.account }}.tfvars -out=tfplan
 
       - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-s3
+          name: tfplan-s3-${{ inputs.account }}
           path: ${{ env.WORKING_DIRECTORY }}/tfplan
           retention-days: 1
 
@@ -66,7 +74,7 @@ jobs:
     name: Terraform Apply (Manual Approval)
     needs: plan
     runs-on: ubuntu-latest
-    environment: prod
+    environment: ${{ inputs.account }}
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIRECTORY }}
@@ -77,7 +85,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -91,7 +99,7 @@ jobs:
       - name: Download Plan
         uses: actions/download-artifact@v4
         with:
-          name: tfplan-s3
+          name: tfplan-s3-${{ inputs.account }}
           path: ${{ env.WORKING_DIRECTORY }}
 
       - name: Terraform Apply
@@ -101,6 +109,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tfstate-s3
+          name: tfstate-s3-${{ inputs.account }}
           path: ${{ env.WORKING_DIRECTORY }}/terraform.tfstate
           retention-days: 30
