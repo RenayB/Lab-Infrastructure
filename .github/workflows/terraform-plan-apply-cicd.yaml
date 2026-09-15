@@ -35,16 +35,14 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      # Backend is defined inline in main.tf for this stack, so no
-      # -backend-config file is needed here.
       - name: Terraform Init
-        run: terraform init -input=false
+        run: terraform init -input=false -backend-config=backend/dev.hcl
 
       - name: Terraform Validate
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -input=false -var-file=tfvars/renays-lab.tfvars -out=tfplan
+        run: terraform plan -input=false -var-file=tfvars/dev.tfvars -out=tfplan
 
       - name: Upload Plan
         uses: actions/upload-artifact@v4
@@ -57,7 +55,7 @@ jobs:
     name: Terraform Apply (Manual Approval)
     needs: plan
     runs-on: ubuntu-latest
-    environment: prod
+    environment: dev
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIRECTORY }}
@@ -77,7 +75,7 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        run: terraform init -input=false
+        run: terraform init -input=false -backend-config=backend/dev.hcl
 
       - name: Download Plan
         uses: actions/download-artifact@v4

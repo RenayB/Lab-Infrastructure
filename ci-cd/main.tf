@@ -6,11 +6,7 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket = "renays-lab-s3"
-    key    = "renays-lab-ci-cd-tf-state/terraform.tfstate"
-    region = "us-east-2"
-  }
+  # Bucket/key/region are supplied per-account via
+  # `terraform init -backend-config=backend/<account>.hcl`
+  backend "s3" {}
 }
-
-data "aws_caller_identity" "current" {}
