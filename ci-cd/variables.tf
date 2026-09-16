@@ -8,3 +8,9 @@ variable "github_repos" {
     `curl https://api.github.com/repos/OWNER/REPO` (.id and .owner.id).
   EOT
 }
+
+variable "tags" {
+  type        = map(string)
+  description = "Tags to apply to created resources."
+  default     = {}
+}

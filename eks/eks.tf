@@ -29,6 +29,7 @@ module "eks" {
 resource "aws_iam_policy" "cert_manager_route53" {
   name        = "cert-manager-route53-policy"
   description = "Route53 permissions for cert-manager DNS01 challenges"
+  tags        = var.tags
 
   policy = jsonencode({
     Version = "2012-10-17"

@@ -14,5 +14,6 @@ node_group_name = "renays-lab-dev-eks-node-group"
 endpoint_public_access_cidrs = []
 
 tags = {
-  project = "renays-lab-dev-eks"
+  project     = "renays-lab-dev-eks"
+  environment = "dev"
 }

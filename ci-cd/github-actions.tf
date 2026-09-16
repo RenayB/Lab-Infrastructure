@@ -4,6 +4,7 @@ resource "aws_iam_openid_connect_provider" "openid" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = ["ffffffffffffffffffffffffffffffffffffffff"]
+  tags            = var.tags
 }
 
 locals {
@@ -34,6 +35,7 @@ locals {
 resource "aws_iam_policy" "terraform_deploy" {
   name        = "renays-lab-terraform-deploy-policy"
   description = "Exactly what eks/ecr/s3/ci-cd stacks need to create - VPC/EKS/IAM/ECR/S3 only."
+  tags        = var.tags
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -184,4 +186,6 @@ module "iam_role" {
   policies = {
     TerraformDeploy = aws_iam_policy.terraform_deploy.arn
   }
+
+  tags = var.tags
 }
