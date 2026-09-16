@@ -7,11 +7,16 @@ public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
 cluster_name    = "renays-lab-dev-eks-cluster"
 node_group_name = "renays-lab-dev-eks-node-group"
 
-# Required, no default - set this before applying (see eks/variables.tf).
-# Left blank here since tfvars files are committed to a public repo and this
-# would otherwise expose a real IP address. Pass locally with:
-#   terraform apply -var-file=tfvars/dev.tfvars -var='endpoint_public_access_cidrs=["YOUR_IP/32"]'
+# API server is private-only (see below), so this is moot - AWS ignores
+# public_access_cidrs whenever endpoint_public_access is false. Left empty
+# rather than removed since the variable is still required.
 endpoint_public_access_cidrs = []
+
+# Private-only API server: reached via the bastion stack over SSM port
+# forwarding, not directly from the internet, so there's no IP to keep
+# updating.
+endpoint_public_access  = false
+endpoint_private_access = true
 
 tags = {
   project     = "renays-lab-dev-eks"

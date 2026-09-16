@@ -1,4 +1,4 @@
-name: Terraform Deploy - EKS
+name: Terraform Deploy - Bastion
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ permissions:
 env:
   TF_VERSION: "1.6.6"
   AWS_REGION: us-east-1
-  WORKING_DIRECTORY: eks
+  WORKING_DIRECTORY: bastion
 
 jobs:
   plan:
@@ -57,16 +57,16 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
+      # Reads the eks stack's state (vpc_id, subnet ids, cluster security
+      # group) via terraform_remote_state - the eks stack must already be
+      # applied for this account before this plan can succeed.
       - name: Terraform Plan
-        # endpoint_public_access_cidrs is left empty in tfvars (committed to a
-        # public repo) and overridden here from a secret instead, so no real
-        # IP address ever lands in git history.
-        run: terraform plan -input=false -var-file=tfvars/${{ inputs.account }}.tfvars -var='endpoint_public_access_cidrs=${{ secrets.EKS_ALLOWED_CIDRS }}' -out=tfplan
+        run: terraform plan -input=false -var-file=tfvars/${{ inputs.account }}.tfvars -out=tfplan
 
       - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-eks-${{ inputs.account }}
+          name: tfplan-bastion-${{ inputs.account }}
           path: ${{ env.WORKING_DIRECTORY }}/tfplan
           retention-days: 1
 
@@ -99,7 +99,7 @@ jobs:
       - name: Download Plan
         uses: actions/download-artifact@v4
         with:
-          name: tfplan-eks-${{ inputs.account }}
+          name: tfplan-bastion-${{ inputs.account }}
           path: ${{ env.WORKING_DIRECTORY }}
 
       - name: Terraform Apply

@@ -24,11 +24,16 @@ locals {
     "arn:aws:iam::${local.account_id}:role/eks-node-role",
     "arn:aws:iam::${local.account_id}:role/cert-manager-irsa-role",
     "arn:aws:iam::${local.account_id}:role/renays-lab-github-actions-role",
+    "arn:aws:iam::${local.account_id}:role/renays-lab-dev-bastion-role",
   ]
 
   managed_policy_arns = [
     "arn:aws:iam::${local.account_id}:policy/cert-manager-route53-policy",
     "arn:aws:iam::${local.account_id}:policy/renays-lab-terraform-deploy-policy",
+  ]
+
+  managed_instance_profile_arns = [
+    "arn:aws:iam::${local.account_id}:instance-profile/renays-lab-dev-bastion-role",
   ]
 }
 
@@ -52,7 +57,8 @@ resource "aws_iam_policy" "terraform_deploy" {
           "ec2:AuthorizeSecurityGroupIngress", "ec2:AuthorizeSecurityGroupEgress", "ec2:RevokeSecurityGroupIngress", "ec2:RevokeSecurityGroupEgress",
           "ec2:CreateLaunchTemplate", "ec2:CreateLaunchTemplateVersion", "ec2:ModifyLaunchTemplate", "ec2:DeleteLaunchTemplate", "ec2:DescribeLaunchTemplates", "ec2:DescribeLaunchTemplateVersions",
           "ec2:CreateTags", "ec2:DeleteTags",
-          "ec2:DescribeAvailabilityZones", "ec2:DescribeImages", "ec2:DescribeInstanceTypes", "ec2:DescribeAccountAttributes", "ec2:DescribeInstances", "ec2:DescribeNetworkInterfaces"
+          "ec2:DescribeAvailabilityZones", "ec2:DescribeImages", "ec2:DescribeInstanceTypes", "ec2:DescribeAccountAttributes", "ec2:DescribeInstances", "ec2:DescribeNetworkInterfaces",
+          "ec2:RunInstances", "ec2:TerminateInstances", "ec2:StopInstances", "ec2:StartInstances"
         ]
         # EC2's API doesn't support resource-level ARNs for most of these
         # create/describe calls - Resource "*" is the practical floor here,
@@ -88,6 +94,24 @@ resource "aws_iam_policy" "terraform_deploy" {
         Action    = "iam:PassRole"
         Resource  = local.managed_role_arns
         Condition = { StringEquals = { "iam:PassedToService" = "eks.amazonaws.com" } }
+      },
+      {
+        Sid      = "IAMPassRoleToEC2"
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = "arn:aws:iam::${local.account_id}:role/renays-lab-dev-bastion-role"
+        Condition = {
+          StringEquals = { "iam:PassedToService" = "ec2.amazonaws.com" }
+        }
+      },
+      {
+        Sid    = "IAMInstanceProfileManagement"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile", "iam:GetInstanceProfile",
+          "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile", "iam:TagInstanceProfile"
+        ]
+        Resource = local.managed_instance_profile_arns
       },
       {
         Sid    = "IAMPolicyManagement"
