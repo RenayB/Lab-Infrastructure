@@ -14,7 +14,7 @@ locals {
     for item in var.github_repos :
     "repo:${item}:*"
   ]
-  
+
   managed_role_arns = [
     "arn:aws:iam::${local.account_id}:role/eks-cluster-role",
     "arn:aws:iam::${local.account_id}:role/eks-node-role",
@@ -47,21 +47,16 @@ resource "aws_iam_policy" "terraform_deploy" {
         Action = [
           "ec2:CreateVpc",
           "ec2:DeleteVpc",
-          "ec2:DescribeVpcs",
           "ec2:ModifyVpcAttribute",
-          "ec2:DescribeVpcAttribute",
           "ec2:CreateInternetGateway",
           "ec2:DeleteInternetGateway",
           "ec2:AttachInternetGateway",
           "ec2:DetachInternetGateway",
-          "ec2:DescribeInternetGateways",
           "ec2:CreateSubnet",
           "ec2:DeleteSubnet",
-          "ec2:DescribeSubnets",
           "ec2:ModifySubnetAttribute",
           "ec2:CreateRouteTable",
           "ec2:DeleteRouteTable",
-          "ec2:DescribeRouteTables",
           "ec2:CreateRoute",
           "ec2:DeleteRoute",
           "ec2:AssociateRouteTable",
@@ -69,8 +64,6 @@ resource "aws_iam_policy" "terraform_deploy" {
           "ec2:ReplaceRouteTableAssociation",
           "ec2:CreateSecurityGroup",
           "ec2:DeleteSecurityGroup",
-          "ec2:DescribeSecurityGroups",
-          "ec2:DescribeSecurityGroupRules",
           "ec2:AuthorizeSecurityGroupIngress",
           "ec2:AuthorizeSecurityGroupEgress",
           "ec2:RevokeSecurityGroupIngress",
@@ -79,20 +72,16 @@ resource "aws_iam_policy" "terraform_deploy" {
           "ec2:CreateLaunchTemplateVersion",
           "ec2:ModifyLaunchTemplate",
           "ec2:DeleteLaunchTemplate",
-          "ec2:DescribeLaunchTemplates",
-          "ec2:DescribeLaunchTemplateVersions",
           "ec2:CreateTags",
           "ec2:DeleteTags",
-          "ec2:DescribeAvailabilityZones",
-          "ec2:DescribeImages",
-          "ec2:DescribeInstanceTypes",
-          "ec2:DescribeAccountAttributes",
-          "ec2:DescribeInstances",
-          "ec2:DescribeNetworkInterfaces",
           "ec2:RunInstances",
           "ec2:TerminateInstances",
           "ec2:StopInstances",
-          "ec2:StartInstances"
+          "ec2:StartInstances",
+          # Read-only, so wildcarding is low-risk and avoids relitigating
+          # this policy every time a resource read/refresh needs one more
+          # ec2:Describe* action we didn't happen to enumerate up front.
+          "ec2:Describe*"
         ]
         Resource = "*"
       },
@@ -102,20 +91,16 @@ resource "aws_iam_policy" "terraform_deploy" {
         Action = [
           "eks:CreateCluster",
           "eks:DeleteCluster",
-          "eks:DescribeCluster",
-          "eks:ListClusters",
           "eks:UpdateClusterConfig",
           "eks:UpdateClusterVersion",
           "eks:TagResource",
           "eks:UntagResource",
-          "eks:ListTagsForResource",
           "eks:CreateNodegroup",
           "eks:DeleteNodegroup",
-          "eks:DescribeNodegroup",
-          "eks:ListNodegroups",
           "eks:UpdateNodegroupConfig",
           "eks:UpdateNodegroupVersion",
-          "eks:DescribeUpdate"
+          "eks:Describe*",
+          "eks:List*"
         ]
         Resource = "*"
       },
@@ -206,6 +191,15 @@ resource "aws_iam_policy" "terraform_deploy" {
         Action    = "iam:CreateServiceLinkedRole"
         Resource  = "*"
         Condition = { StringEquals = { "iam:AWSServiceName" = ["eks.amazonaws.com", "eks-nodegroup.amazonaws.com"] } }
+      },
+      {
+        Sid    = "IAMServiceLinkedRoleReadForEKS"
+        Effect = "Allow"
+        Action = "iam:GetRole"
+        Resource = [
+          "arn:aws:iam::${local.account_id}:role/*AWSServiceRoleForAmazonEKS",
+          "arn:aws:iam::${local.account_id}:role/*AWSServiceRoleForAmazonEKSNodegroup",
+        ]
       },
       {
         Sid      = "ECRAuth"

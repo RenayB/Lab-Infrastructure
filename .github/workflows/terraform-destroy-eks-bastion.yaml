@@ -1,0 +1,182 @@
+name: Terraform Destroy - EKS & Bastion
+
+# Order matters here: bastion reads the eks stack's state via
+# terraform_remote_state, so bastion must be destroyed first while that
+# state still has valid vpc/subnet/security-group values. Destroying eks
+# first would break bastion's own destroy plan.
+
+on:
+  workflow_dispatch:
+    inputs:
+      account:
+        description: "AWS account to destroy in"
+        type: choice
+        options:
+          - dev
+        default: dev
+        required: true
+      confirm:
+        description: 'Type "destroy" to confirm - this deletes the EKS cluster and the bastion instance'
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_VERSION: "1.6.6"
+  AWS_REGION: us-east-1
+
+jobs:
+  check-confirmation:
+    name: Verify Confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirm input
+        run: |
+          if [ "${{ inputs.confirm }}" != "destroy" ]; then
+            echo "::error::Confirmation input must be exactly 'destroy' (got '${{ inputs.confirm }}') - aborting."
+            exit 1
+          fi
+
+  plan-destroy-bastion:
+    name: Plan Destroy - Bastion
+    needs: check-confirmation
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.account }}
+    defaults:
+      run:
+        working-directory: bastion
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false -backend-config=backend/${{ inputs.account }}.hcl
+
+      - name: Terraform Plan Destroy
+        run: terraform plan -destroy -input=false -var-file=tfvars/${{ inputs.account }}.tfvars -out=tfplan
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-destroy-bastion-${{ inputs.account }}
+          path: bastion/tfplan
+          retention-days: 1
+
+  destroy-bastion:
+    name: Destroy (Manual Approval) - Bastion
+    needs: plan-destroy-bastion
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.account }}
+    defaults:
+      run:
+        working-directory: bastion
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false -backend-config=backend/${{ inputs.account }}.hcl
+
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-destroy-bastion-${{ inputs.account }}
+          path: bastion
+
+      - name: Terraform Apply (Destroy)
+        run: terraform apply -input=false -auto-approve tfplan
+
+  plan-destroy-eks:
+    name: Plan Destroy - EKS
+    needs: destroy-bastion
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.account }}
+    defaults:
+      run:
+        working-directory: eks
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false -backend-config=backend/${{ inputs.account }}.hcl
+
+      - name: Terraform Plan Destroy
+        run: terraform plan -destroy -input=false -var-file=tfvars/${{ inputs.account }}.tfvars -out=tfplan
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-destroy-eks-${{ inputs.account }}
+          path: eks/tfplan
+          retention-days: 1
+
+  destroy-eks:
+    name: Destroy (Manual Approval) - EKS
+    needs: plan-destroy-eks
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.account }}
+    defaults:
+      run:
+        working-directory: eks
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false -backend-config=backend/${{ inputs.account }}.hcl
+
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-destroy-eks-${{ inputs.account }}
+          path: eks
+
+      - name: Terraform Apply (Destroy)
+        run: terraform apply -input=false -auto-approve tfplan
