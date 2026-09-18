@@ -1,0 +1,64 @@
+name: EKS Node Group Scale
+on:
+  workflow_dispatch:
+    inputs:
+      account:
+        description: "AWS account"
+        type: choice
+        options:
+          - dev
+        default: dev
+        required: true
+      desired_size:
+        description: "Desired node count"
+        type: choice
+        options:
+          - "0"
+          - "1"
+        default: "1"
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  scale:
+    name: Scale Node Group to ${{ inputs.desired_size }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.account }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Reads the actual names from tfvars instead of hardcoding them here,
+      # so this can't drift from what the eks stack actually deployed.
+      - name: Read cluster/nodegroup names
+        id: names
+        run: |
+          cluster_name=$(grep '^cluster_name' eks/tfvars/${{ inputs.account }}.tfvars | cut -d'"' -f2)
+          node_group_name=$(grep '^node_group_name' eks/tfvars/${{ inputs.account }}.tfvars | cut -d'"' -f2)
+          echo "cluster_name=$cluster_name" >> "$GITHUB_OUTPUT"
+          echo "node_group_name=$node_group_name" >> "$GITHUB_OUTPUT"
+
+      - name: Scale Node Group
+        run: |
+          aws eks update-nodegroup-config \
+            --cluster-name "${{ steps.names.outputs.cluster_name }}" \
+            --nodegroup-name "${{ steps.names.outputs.node_group_name }}" \
+            --scaling-config minSize=0,maxSize=1,desiredSize=${{ inputs.desired_size }}
+
+      - name: Wait for Node Group to Settle
+        run: |
+          aws eks wait nodegroup-active \
+            --cluster-name "${{ steps.names.outputs.cluster_name }}" \
+            --nodegroup-name "${{ steps.names.outputs.node_group_name }}"

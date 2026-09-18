@@ -184,4 +184,12 @@ resource "aws_eks_node_group" "this" {
   instance_types = var.node_instance_types
 
   tags = var.tags
+
+  # desired_size gets changed directly via `aws eks update-nodegroup-config`
+  # (scale-to-0-when-idle) rather than through Terraform, since that's a
+  # frequent operational toggle, not an infra change. Without this, the next
+  # unrelated `apply` would silently revert it back to var.node_desired_size.
+  lifecycle {
+    ignore_changes = [scaling_config[0].desired_size]
+  }
 }
