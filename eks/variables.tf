@@ -34,6 +34,18 @@ variable "endpoint_public_access_cidrs" {
   description = "CIDR blocks allowed to reach the public EKS API server endpoint."
 }
 
+variable "endpoint_public_access" {
+  type        = bool
+  description = "Whether the cluster API server endpoint is publicly accessible."
+  default     = true
+}
+
+variable "endpoint_private_access" {
+  type        = bool
+  description = "Whether the cluster API server endpoint is privately accessible from the VPC."
+  default     = false
+}
+
 variable "cluster_role_name" {
   type        = string
   description = "Name of the IAM role for the EKS control plane."

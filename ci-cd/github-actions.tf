@@ -119,6 +119,7 @@ resource "aws_iam_policy" "terraform_deploy" {
           "iam:DetachRolePolicy",
           "iam:ListAttachedRolePolicies",
           "iam:ListRolePolicies",
+          "iam:ListInstanceProfilesForRole",
           "iam:PutRolePolicy",
           "iam:DeleteRolePolicy",
           "iam:GetRolePolicy"

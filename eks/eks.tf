@@ -18,6 +18,8 @@ module "eks" {
   vpc_id                       = module.vpc.vpc_id
   subnet_ids                   = module.vpc.public_subnet_ids
   endpoint_public_access_cidrs = var.endpoint_public_access_cidrs
+  endpoint_public_access       = var.endpoint_public_access
+  endpoint_private_access      = var.endpoint_private_access
   node_instance_types          = var.node_instance_types
   node_desired_size            = var.node_desired_size
   node_min_size                = var.node_min_size
