@@ -38,3 +38,49 @@ This part of the README becomes very detailed and highlights some concpets for m
 5. NGINX Gateway Fabric's control plane picks up that Secret and loads it into the data plane — this is the certificate that's ready and waiting when a real client's TLS handshake (step 3 of the User Traffic Flow above) happens.
 
 ![Certificate flow](docs/images/certificate-flow.png)
+
+## AWS Well-Architected Framework Influence
+
+As a matter of good practice, I wanted to make sure I applied the AWS Well-Architected Framework throughout this lab. Below is how each of its six pillars shows up here.
+
+### 1. Security
+
+- **No long-lived AWS keys in CI/CD:** GitHub Actions authenticates through OIDC federation. 
+- **Least-privilege deploy policy:** IAM actions are scoped to specific role, policy, and instance-profile ARNs. ECR and S3 access is limited to `renays-lab*` resources, and `iam:PassRole` is restricted by `iam:PassedToService`.
+- **IRSA:** cert-manager gets its Route53 permissions through a role that only its own Kubernetes service account can assume, instead of borrowing the node role.
+- **Private EKS API endpoint:** The control plane isn't reachable from the internet. Access goes through an SSM bastion that has no inbound ports and no SSH keys.
+- **Locked-down networking:** The node security group allows no inbound traffic from the internet, only node-to-node and control-plane traffic.
+- **Secure S3 defaults:** Public access is blocked, server-side encryption is on, ACLs are disabled (`BucketOwnerEnforced`), and requests that don't use TLS are denied.
+- **Scanning:** Trivy scans the Terraform code before every plan, and ECR scans container images on push.
+- **No secrets in git:** Sensitive values are injected from GitHub secrets at plan time.
+
+### 2. Operational Excellence
+
+- **Infrastructure as code:** Everything is Terraform, built from reusable modules (`vpc`, `eks-cluster`, `irsa-role`, `s3-bucket`, `ecr-repo`).
+- **Isolated stacks:** Each stack (eks, bastion, dns, ecr, s3, ci-cd) has its own remote state, which limits the blast radius of a change. It also allows 
+- **Safe teardown:** The destroy workflow requires typed confirmation and removes stacks in dependency order.
+- **GitOps:** ArgoCD keeps the cluster in sync with the [Lab](https://github.com/RenayB/Lab) repo.
+
+### 3. Reliability
+
+- **Multi-AZ:** The VPC subnets span two availability zones.
+- **Recoverable state:** Terraform state lives in versioned S3 buckets.
+- **Managed services:** The EKS control plane, managed node groups, and Route53 take care of many failure modes.
+- **Automated certificate renewal:** cert-manager renews certificates with Let's Encrypt on its own.
+- **Safe replacements:** `create_before_destroy` on security groups, plus a wait-for-active step when scaling the node group.
+
+### 4. Performance Efficiency
+
+- **Right-sized compute:** The node instance type is based on observed memory pressure (t3.small to t3.medium).
+- **One shared Gateway:** A single load balancer serves all routes, with TLS terminated at the edge.
+
+### 5. Cost Optimization
+
+- **Scale to zero:** The node group runs at 0–1 nodes and has a one-click scale workflow. Terraform ignores `desired_size`, so an apply never undoes a manual scale.
+- **No NAT gateway:** Nodes sit in public subnets protected by security groups, which avoids NAT costs.
+- **On-demand environments:** The EKS cluster and bastion can be torn down and recreated through pipelines.
+- **Consistent tagging** (`project`, `environment`) for cost allocation.
+
+### 6. Sustainability
+
+- **Nothing idles needlessly:** Scale-to-zero and on-demand teardown mean resources run only when they're needed.
